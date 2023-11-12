@@ -1,4 +1,4 @@
-module bubbleplay
+module github.com/Kbs56/HouseHunter
 
 go 1.21.3
 
