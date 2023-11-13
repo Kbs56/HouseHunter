@@ -1,13 +1,9 @@
 package main
 
-// A simple example demonstrating the use of multiple text input components
-// from the Bubbles component library.
-
 import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -97,19 +93,14 @@ func initialModel() model {
 	return m
 }
 
-func getData(inputs []textinput.Model) string {
-	time.Sleep(time.Second * 2)
-	s := strings.Builder{}
-	for _, v := range inputs {
-		s.WriteString(v.Value() + "\n")
-	}
-	return s.String()
-}
-
 func (m model) fetchResults(inputs []textinput.Model) tea.Cmd {
 	return func() tea.Msg {
 		message := houseHunt(inputs)
-		return GotHouses{Data: message}
+		s := strings.Builder{}
+		for house := range message {
+			s.WriteString(house + "\n")
+		}
+		return GotHouses{Data: s.String()}
 	}
 }
 
@@ -214,7 +205,6 @@ func (m *model) updateInputs(msg tea.Msg) tea.Cmd {
 
 func (m model) View() string {
 	if m.typing {
-
 		var b strings.Builder
 
 		for i := range m.inputs {

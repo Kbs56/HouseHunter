@@ -19,7 +19,7 @@ func printInputs(inputs []textinput.Model) {
 	fmt.Println()
 }
 
-func houseHunt(inputs []textinput.Model) string {
+func houseHunt(inputs []textinput.Model) chan string {
 	areas := strings.Split(inputs[0].Value(), ",")
 	priceMin := convertStringToNum(inputs[1].Value())
 	priceMax := convertStringToNum(inputs[2].Value())
@@ -42,11 +42,7 @@ func houseHunt(inputs []textinput.Model) string {
 		close(ch)
 	}()
 
-	s := strings.Builder{}
-	for res := range ch {
-		s.WriteString(res + "\n")
-	}
-	return s.String()
+	return ch
 }
 
 func calculateStatus(lookingFor string) []string {
