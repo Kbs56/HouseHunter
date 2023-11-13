@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/cursor"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -26,9 +28,17 @@ var (
 )
 
 type model struct {
-	focusIndex int
-	inputs     []textinput.Model
-	cursorMode cursor.Mode
+	focusIndex    int
+	inputs        []textinput.Model
+	cursorMode    cursor.Mode
+	spinner       spinner.Model
+	typing        bool
+	loading       bool
+	SearchResults string
+}
+
+type GotHouses struct {
+	Data string
 }
 
 func initialModel() model {
@@ -79,7 +89,28 @@ func initialModel() model {
 		}
 		m.inputs[i] = t
 	}
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	m.spinner = s
+	m.typing = true
+	m.loading = false
 	return m
+}
+
+func getData(inputs []textinput.Model) string {
+	time.Sleep(time.Second * 2)
+	s := strings.Builder{}
+	for _, v := range inputs {
+		s.WriteString(v.Value() + "\n")
+	}
+	return s.String()
+}
+
+func (m model) fetchResults(inputs []textinput.Model) tea.Cmd {
+	return func() tea.Msg {
+		message := getData(inputs)
+		return GotHouses{Data: message}
+	}
 }
 
 func (m model) Init() tea.Cmd {
@@ -112,9 +143,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Did the user press enter while the submit button was focused?
 			// If so, call the api, get the results and then exit.
 			if s == "enter" && m.focusIndex == len(m.inputs) {
-				printInputs(m.inputs)
-				houseHunt(m.inputs)
-				return m, tea.Quit
+				// printInputs(m.inputs)
+				// houseHunt(m.inputs)
+				m.typing = false
+				m.loading = true
+				return m, tea.Batch(m.spinner.Tick, m.fetchResults(m.inputs))
+				// return m, tea.Quit
 			}
 
 			// Cycle indexes
@@ -143,10 +177,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.inputs[i].Blur()
 				m.inputs[i].PromptStyle = noStyle
 				m.inputs[i].TextStyle = noStyle
-
-				return m, tea.Batch(cmds...)
 			}
+			return m, tea.Batch(cmds...)
 		}
+	case GotHouses:
+		m.SearchResults = msg.Data
+		m.loading = false
+		return m, nil
+	}
+
+	if m.loading {
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 	}
 
 	// Handle character input and blinking
@@ -168,26 +211,36 @@ func (m *model) updateInputs(msg tea.Msg) tea.Cmd {
 }
 
 func (m model) View() string {
-	var b strings.Builder
+	if m.typing {
 
-	for i := range m.inputs {
-		b.WriteString(m.inputs[i].View())
-		if i < len(m.inputs)-1 {
-			b.WriteRune('\n')
+		var b strings.Builder
+
+		for i := range m.inputs {
+			b.WriteString(m.inputs[i].View())
+			if i < len(m.inputs)-1 {
+				b.WriteRune('\n')
+			}
 		}
+
+		button := &blurredButton
+		if m.focusIndex == len(m.inputs) {
+			button = &focusedButton
+		}
+		fmt.Fprintf(&b, "\n\n%s\n\n", *button)
+
+		b.WriteString(helpStyle.Render("cursor mode is "))
+		b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
+		b.WriteString(helpStyle.Render(" (ctrl+r to change style)"))
+
+		return b.String()
 	}
-
-	button := &blurredButton
-	if m.focusIndex == len(m.inputs) {
-		button = &focusedButton
+	if m.loading {
+		return fmt.Sprintf("%s Fetching your message...", m.spinner.View())
 	}
-	fmt.Fprintf(&b, "\n\n%s\n\n", *button)
-
-	b.WriteString(helpStyle.Render("cursor mode is "))
-	b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
-	b.WriteString(helpStyle.Render(" (ctrl+r to change style)"))
-
-	return b.String()
+	return fmt.Sprintf(
+		"Here is the message that we fetched for you: \n%s\nPress (ctrl+c to quit, or escape to fetch another message)",
+		m.SearchResults,
+	)
 }
 
 func main() {
