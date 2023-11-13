@@ -108,7 +108,7 @@ func getData(inputs []textinput.Model) string {
 
 func (m model) fetchResults(inputs []textinput.Model) tea.Cmd {
 	return func() tea.Msg {
-		message := getData(inputs)
+		message := houseHunt(inputs)
 		return GotHouses{Data: message}
 	}
 }
@@ -121,6 +121,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "r":
+			m.typing = true
+			m.loading = false
+			m := initialModel()
+			return m, nil
 		case "ctrl+c", "esc":
 			return m, tea.Quit
 
@@ -141,14 +146,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s := msg.String()
 
 			// Did the user press enter while the submit button was focused?
-			// If so, call the api, get the results and then exit.
+			// If so, call the api, get the results and then display the results
 			if s == "enter" && m.focusIndex == len(m.inputs) {
-				// printInputs(m.inputs)
-				// houseHunt(m.inputs)
 				m.typing = false
 				m.loading = true
 				return m, tea.Batch(m.spinner.Tick, m.fetchResults(m.inputs))
-				// return m, tea.Quit
 			}
 
 			// Cycle indexes
@@ -238,13 +240,13 @@ func (m model) View() string {
 		return fmt.Sprintf("%s Fetching your message...", m.spinner.View())
 	}
 	return fmt.Sprintf(
-		"Here is the message that we fetched for you: \n%s\nPress (ctrl+c to quit, or escape to fetch another message)",
+		"Here are the houses that we fetched for you: \n\n%s\nPress (ctrl+c to quit, or r to search again)",
 		m.SearchResults,
 	)
 }
 
 func main() {
-	if _, err := tea.NewProgram(initialModel()).Run(); err != nil {
+	if _, err := tea.NewProgram(initialModel(), tea.WithAltScreen()).Run(); err != nil {
 		fmt.Printf("could not start program: %s\n", err)
 		os.Exit(1)
 	}
